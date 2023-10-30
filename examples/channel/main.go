@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	
+
 	amqp "github.com/oarkflow/amqp/amqp091"
-	
+
 	grabbit "github.com/oarkflow/amqp"
 )
 
@@ -44,7 +44,7 @@ func DataChanReattempting(name string, retry int) bool {
 
 func main() {
 	connStatusChan := make(chan grabbit.Event, 32)
-	
+
 	// capture status notifications and perform desired actions based on this
 	// like e.g. cancel the global context, adjust metrics, exit the app... whatever your requirements fancy
 	go func() {
@@ -55,19 +55,19 @@ func main() {
 			_ = event
 		}
 	}()
-	
+
 	conn := grabbit.NewConnection(
-		"amqp://guest:guest@localhost", amqp.Config{},
+		"amqp://guest:guest@localhost:5672", amqp.Config{},
 		grabbit.WithConnectionOptionName("conn.main"),
 		grabbit.WithConnectionOptionNotification(connStatusChan),
 		grabbit.WithConnectionOptionDown(ConnDown),
 		grabbit.WithConnectionOptionUp(ConnUp),
 		grabbit.WithConnectionOptionRecovering(ConnReattempting),
 	)
-	
+
 	dataStatusChan := make(chan grabbit.Event, 5)
 	ctxData, ctxDataCancel := context.WithCancel(context.TODO())
-	
+
 	dataCh := grabbit.NewChannel(conn,
 		grabbit.WithChannelOptionContext(ctxData),
 		grabbit.WithChannelOptionName("chan.data"),
@@ -83,16 +83,16 @@ func main() {
 		// WithChannelOptionTopology()      // see TopologyOptions, publishers & consumers
 		// WithChannelOptionUsageParams()   // see ChanUsageParameters, publishers and consumers
 	)
-	
+
 	// data channel related notifications and perform desired actions based on this
 	go func(ch *grabbit.Channel) {
 		for event := range dataStatusChan {
 			log.Print("cmd.notification: ", event)
-			
+
 			if event.Kind == grabbit.EventUp {
 				// on error QueueDeclarePassive() throws and kills your channel
 				// q, err := dataCh.QueueDeclarePassive("grabbit_demo_data", true, true, false, false, make(amqp.Table))
-				
+
 				q, err := dataCh.QueueDeclare("grabbit_demo_data", false, true, false, false, make(amqp.Table))
 				if err != nil {
 					log.Print("cmd error: ", err)
@@ -102,7 +102,7 @@ func main() {
 			}
 		}
 	}(dataCh)
-	
+
 	defer func() {
 		fmt.Println("app closing connection and dependencies")
 		// -------
@@ -110,7 +110,7 @@ func main() {
 		// -------
 		_ = dataCh.Close() // either/or via closing
 		ctxDataCancel()    // either/or via ctx. Warning: no EventDown/EventClosed pushed
-		
+
 		<-time.After(3 * time.Second)
 		// reconnect loop should be dead now
 		if err := conn.Close(); err != nil {
@@ -118,20 +118,20 @@ func main() {
 		}
 		<-time.After(3 * time.Second)
 	}()
-	
+
 	// block main thread - wait for shutdown signal
 	sigs := make(chan os.Signal, 1)
 	done := make(chan struct{})
-	
+
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	go func() {
 		sig := <-sigs
 		fmt.Println()
 		fmt.Println(sig)
 		close(done)
 	}()
-	
+
 	fmt.Println("awaiting signal")
 	<-done
 }

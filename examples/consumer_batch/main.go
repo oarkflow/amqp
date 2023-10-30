@@ -11,9 +11,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	
+
 	amqp "github.com/oarkflow/amqp/amqp091"
-	
+
 	grabbit "github.com/oarkflow/amqp"
 )
 
@@ -26,12 +26,12 @@ func PublishMsg(publisher *grabbit.Publisher, start, end int) {
 	message := amqp.Publishing{}
 	data := make([]byte, 0, 64)
 	buff := bytes.NewBuffer(data)
-	
+
 	for i := start; i < end; i++ {
 		buff.Reset()
 		buff.WriteString(fmt.Sprintf("msg-%d", i))
 		message.Body = buff.Bytes()
-		
+
 		if err := publisher.Publish(message); err != nil {
 			log.Println("publishing failed with: ", err)
 		}
@@ -42,7 +42,7 @@ func PublishMsg(publisher *grabbit.Publisher, start, end int) {
 func HandleMsgRegistry(ctx context.Context, r map[string]struct{}, mu *sync.Mutex, ch chan grabbit.DeliveryPayload) {
 	mu.Lock()
 	defer mu.Unlock()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -74,13 +74,13 @@ func MsgHandler(rnd *rand.Rand, mu *sync.Mutex, chReg chan grabbit.DeliveryPaylo
 		if !mustAck {
 			return
 		}
-		
+
 		idxPivot := 2 * len(messages) / 3
 		idxLast := len(messages) - 1
 		firstDeliveryTag := messages[0].DeliveryTag
 		pivotDeliveryTag := messages[idxPivot].DeliveryTag
 		lastDeliveryTag := messages[idxLast].DeliveryTag
-		
+
 		if len(messages) < 5 {
 			log.Printf("\n\t[%s] bulk ACK all deliveries [%04d - %04d] %s\n",
 				props.ConsumerTag, firstDeliveryTag, lastDeliveryTag,
@@ -120,12 +120,12 @@ func main() {
 	PublisherName := "chan.publisher.example"
 	QueueName := "workload"
 	const MSG_COUNT = 500
-	
+
 	events := make(chan grabbit.Event, 10)
 	defer close(events)
-	
+
 	ctxMaster, ctxCancel := context.WithCancel(context.TODO())
-	
+
 	// await and log any infrastructure notifications
 	go func() {
 		for event := range events {
@@ -133,17 +133,17 @@ func main() {
 			// _ = event
 		}
 	}()
-	
+
 	conn := grabbit.NewConnection(
-		"amqp://guest:guest@localhost", amqp.Config{},
+		"amqp://guest:guest@localhost:5672", amqp.Config{},
 		grabbit.WithConnectionOptionContext(ctxMaster),
 		grabbit.WithConnectionOptionName(ConnectionName),
 		grabbit.WithConnectionOptionNotification(events),
 	)
-	
+
 	opt := grabbit.DefaultPublisherOptions()
 	opt.WithKey(QueueName).WithContext(ctxMaster).WithConfirmationsCount(20)
-	
+
 	topos := make([]*grabbit.TopologyOptions, 0, 8)
 	topos = append(topos, &grabbit.TopologyOptions{
 		Name:          QueueName,
@@ -151,13 +151,13 @@ func main() {
 		Durable:       true,
 		Declare:       true,
 	})
-	
+
 	publisher := grabbit.NewPublisher(conn, opt,
 		grabbit.WithChannelOptionName(PublisherName),
 		grabbit.WithChannelOptionTopology(topos),
 		grabbit.WithChannelOptionNotifyReturn(OnNotifyReturn),
 	)
-	
+
 	if !publisher.AwaitAvailable(30*time.Second, 1*time.Second) {
 		log.Println("publisher not ready yet")
 		ctxCancel()
@@ -166,18 +166,18 @@ func main() {
 		return
 	}
 	PublishMsg(publisher, 0, MSG_COUNT)
-	
+
 	rnd := rand.New(rand.NewSource(543752))
 	mu := sync.Mutex{}
 	validate := make(chan grabbit.DeliveryPayload, 300)
-	
+
 	msgRegistry := make(map[string]struct{})
 	muReg := sync.Mutex{}
 	go HandleMsgRegistry(ctxMaster, msgRegistry, &muReg, validate)
-	
+
 	optConsumer := grabbit.DefaultConsumerOptions()
 	optConsumer.WithQueue(QueueName).WithPrefetchTimeout(5 * time.Second)
-	
+
 	// start many consumers
 	_ = grabbit.NewConsumer(conn, *optConsumer.WithPrefetchCount(8).WithName("consumer.one"),
 		grabbit.WithChannelOptionName("chan.cons.one"),
@@ -195,19 +195,19 @@ func main() {
 		grabbit.WithChannelOptionName("chan.cons.four"),
 		grabbit.WithChannelOptionProcessor(MsgHandler(rnd, &mu, validate)),
 	)
-	
+
 	// block main thread - wait for shutdown signal
 	sigs := make(chan os.Signal, 1)
 	done := make(chan struct{})
-	
+
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	go func() {
 		sig := <-sigs
 		log.Println(sig)
 		close(done)
 	}()
-	
+
 	log.Println("awaiting signal")
 	// if we restart the Rabbit engine we should get
 	// all the topology recreated when conn/channels recovery has completed

@@ -9,9 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	
+
 	amqp "github.com/oarkflow/amqp/amqp091"
-	
+
 	grabbit "github.com/oarkflow/amqp"
 )
 
@@ -54,7 +54,7 @@ func OnNotifyPublish(confCh chan amqp.Confirmation) grabbit.CallbackNotifyPublis
 			confirmation.Ack,
 			ch.Name(),
 			ch.Queue())
-		
+
 		select {
 		case confCh <- confirmation:
 		default: // no more capacity in 'ch'
@@ -72,7 +72,7 @@ func AwaitPublishConfirmation(seqNo uint64, confCh chan amqp.Confirmation, tmr t
 	result := ConfirmationData{
 		ReqSequence: seqNo,
 	}
-	
+
 	select {
 	case <-time.After(tmr):
 		result.Outcome = ConfirmationTimeOut
@@ -98,16 +98,16 @@ func PublishMsg(confCh chan amqp.Confirmation, publisher *grabbit.Publisher, sta
 	message := amqp.Publishing{}
 	data := make([]byte, 0, 64)
 	buff := bytes.NewBuffer(data)
-	
+
 	for i := start; i < end; i++ {
 		<-time.After(1 * time.Second)
 		buff.Reset()
 		buff.WriteString(fmt.Sprintf("test number %04d", i))
 		message.Body = buff.Bytes()
 		log.Println("going to send:", buff.String())
-		
+
 		nextSeqNo := publisher.Channel().GetNextPublishSeqNo()
-		
+
 		if err := publisher.Publish(message); err != nil {
 			log.Println("publishing failed with: ", err)
 		} else {
@@ -116,7 +116,7 @@ func PublishMsg(confCh chan amqp.Confirmation, publisher *grabbit.Publisher, sta
 				confirmation.Outcome,
 				confirmation.ReqSequence,
 				confirmation.RspSequence)
-			
+
 			if confirmation.ReqSequence != confirmation.RspSequence {
 				log.Println("FIXME! how do we recover from this?")
 			}
@@ -128,10 +128,10 @@ func main() {
 	ConnectionName := "conn.main"
 	ChannelName := "chan.publisher.example"
 	QueueName := "workload"
-	
+
 	ctxMaster, ctxCancel := context.WithCancel(context.TODO())
 	pubStatusChan := make(chan grabbit.Event, 32)
-	
+
 	// await and log any infrastructure notifications
 	go func() {
 		for event := range pubStatusChan {
@@ -139,16 +139,16 @@ func main() {
 			// _ = event
 		}
 	}()
-	
+
 	conn := grabbit.NewConnection(
-		"amqp://guest:guest@localhost", amqp.Config{},
+		"amqp://guest:guest@localhost:5672", amqp.Config{},
 		grabbit.WithConnectionOptionContext(ctxMaster),
 		grabbit.WithConnectionOptionName(ConnectionName),
 	)
-	
+
 	pubOpt := grabbit.DefaultPublisherOptions()
 	pubOpt.WithKey(QueueName).WithContext(ctxMaster).WithConfirmationsCount(20)
-	
+
 	topos := make([]*grabbit.TopologyOptions, 0, 8)
 	topos = append(topos, &grabbit.TopologyOptions{
 		Name:          QueueName,
@@ -156,10 +156,10 @@ func main() {
 		Durable:       true,
 		Declare:       true,
 	})
-	
+
 	// collects from publishers notifications
 	confCh := make(chan amqp.Confirmation, 10)
-	
+
 	publisher := grabbit.NewPublisher(conn, pubOpt,
 		grabbit.WithChannelOptionContext(ctxMaster),
 		grabbit.WithChannelOptionName(ChannelName),
@@ -171,7 +171,7 @@ func main() {
 		grabbit.WithChannelOptionNotifyPublish(OnNotifyPublish(confCh)),
 		grabbit.WithChannelOptionNotifyReturn(OnNotifyReturn),
 	)
-	
+
 	if !publisher.AwaitAvailable(30*time.Second, 1*time.Second) {
 		log.Println("publisher not ready yet")
 		ctxCancel()
@@ -179,37 +179,37 @@ func main() {
 		log.Println("EXIT")
 		return
 	}
-	
+
 	PublishMsg(confCh, publisher, 0, 5)
-	
+
 	defer func() {
 		log.Println("app closing connection and dependencies")
-		
+
 		if err := publisher.Close(); err != nil {
 			log.Println("cannot close publisher: ", err)
 		}
 		// associated chan is gone, can no longer send data
 		PublishMsg(confCh, publisher, 5, 10) // expect failures
-		
+
 		if err := conn.Close(); err != nil {
 			log.Print("cannot close conn: ", err)
 		}
 		<-time.After(3 * time.Second)
 		log.Println("EXIT")
 	}()
-	
+
 	// block main thread - wait for shutdown signal
 	sigs := make(chan os.Signal, 1)
 	done := make(chan struct{})
-	
+
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	go func() {
 		sig := <-sigs
 		log.Println(sig)
 		close(done)
 	}()
-	
+
 	log.Println("awaiting signal")
 	<-done
 }
