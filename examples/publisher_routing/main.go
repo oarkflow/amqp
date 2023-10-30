@@ -15,10 +15,7 @@ import (
 	grabbit "github.com/oarkflow/amqp"
 )
 
-func publishSomeLogs(
-	publisher *grabbit.Publisher,
-	opt grabbit.PublisherOptions,
-	start, end int) {
+func publishSomeLogs(publisher *grabbit.Publisher, opt grabbit.PublisherOptions, start, end int) {
 
 	message := amqp.Publishing{}
 	data := make([]byte, 0, 64)
@@ -186,12 +183,7 @@ func main() {
 	log.Println("EXIT")
 }
 
-func MsgHandler(
-	props *grabbit.DeliveriesProperties,
-	messages []grabbit.DeliveryData,
-	mustAck bool,
-	ch *grabbit.Channel) {
-
+func MsgHandler(props *grabbit.DeliveriesProperties, messages []grabbit.DeliveryData, mustAck bool, ch *grabbit.Channel) {
 	for _, msg := range messages {
 		log.Printf("  [%s][%s] got message: %s\n",
 			ch.Name(), props.ConsumerTag,
