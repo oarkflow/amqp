@@ -142,8 +142,8 @@ func main() {
 
 	conn := grabbit.NewConnection(
 		"amqp://guest:guest@localhost:5672", amqp.Config{},
-		grabbit.WithConnectionOptionContext(ctxMaster),
-		grabbit.WithConnectionOptionName(ConnectionName),
+		grabbit.WithConnectionCtx(ctxMaster),
+		grabbit.WithConnectionName(ConnectionName),
 	)
 
 	pubOpt := grabbit.DefaultPublisherOptions()
@@ -161,15 +161,15 @@ func main() {
 	confCh := make(chan amqp.Confirmation, 10)
 
 	publisher := grabbit.NewPublisher(conn, pubOpt,
-		grabbit.WithChannelOptionContext(ctxMaster),
-		grabbit.WithChannelOptionName(ChannelName),
-		grabbit.WithChannelOptionTopology(topos),
-		grabbit.WithChannelOptionNotification(pubStatusChan),
-		grabbit.WithChannelOptionDown(OnPubDown),
-		grabbit.WithChannelOptionUp(OnPubUp),
-		grabbit.WithChannelOptionRecovering(OnPubReattempting),
-		grabbit.WithChannelOptionNotifyPublish(OnNotifyPublish(confCh)),
-		grabbit.WithChannelOptionNotifyReturn(OnNotifyReturn),
+		grabbit.WithChannelCtx(ctxMaster),
+		grabbit.WithChannelName(ChannelName),
+		grabbit.WithChannelTopology(topos),
+		grabbit.WithChannelNotification(pubStatusChan),
+		grabbit.OnChannelDown(OnPubDown),
+		grabbit.OnChannelUp(OnPubUp),
+		grabbit.OnChannelRecovering(OnPubReattempting),
+		grabbit.OnPublishSuccess(OnNotifyPublish(confCh)),
+		grabbit.OnPublishFailure(OnNotifyReturn),
 	)
 
 	if !publisher.AwaitAvailable(30*time.Second, 1*time.Second) {

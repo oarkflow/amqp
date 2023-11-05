@@ -3,7 +3,7 @@ package grabbit
 import (
 	"context"
 	"fmt"
-	
+
 	amqp "github.com/oarkflow/amqp/amqp091"
 )
 
@@ -27,12 +27,12 @@ type Channel struct {
 // Example Usage:
 //
 //	  chan := NewChannel(conn,
-//	    WithChannelOptionName("myChannel"),
-//	    WithChannelOptionDown(Down),
-//	    WithChannelOptionUp(Up),
-//		WithChannelOptionRecovering(Reattempting),
-//		WithChannelOptionNotification(dataStatusChan),
-//	    WithChannelOptionContext(ctx),
+//	    WithChannelName("myChannel"),
+//	    OnChannelDown(Down),
+//	    OnChannelUp(Up),
+//		OnChannelRecovering(Reattempting),
+//		WithChannelNotification(dataStatusChan),
+//	    WithChannelCtx(ctx),
 //	  )
 //
 // Parameters:
@@ -50,26 +50,26 @@ func NewChannel(conn *Connection, optionFuncs ...func(*ChannelOptions)) *Channel
 		cbProcessMessages: defaultPayloadProcessor,
 		ctx:               conn.opt.ctx,
 	}
-	
+
 	for _, optionFunc := range optionFuncs {
 		optionFunc(opt)
 	}
-	
+
 	ch := &Channel{
 		baseChan: SafeBaseChan{},
 		opt:      *opt,
 		conn:     conn,
 	}
-	
+
 	ch.opt.ctx, ch.opt.cancelCtx = context.WithCancel(opt.ctx)
-	
+
 	go func() {
 		if !ch.reconnectLoop(false) {
 			return
 		}
 		ch.manage()
 	}()
-	
+
 	return ch
 }
 
@@ -81,18 +81,18 @@ func NewChannel(conn *Connection, optionFuncs ...func(*ChannelOptions)) *Channel
 func (ch *Channel) pause(value bool) {
 	ch.paused.mu.Lock()
 	defer ch.paused.mu.Unlock()
-	
+
 	kind := EventUnBlocked
 	if value {
 		kind = EventBlocked
 	}
-	
+
 	Event{
 		SourceType: CliChannel,
 		SourceName: ch.opt.name,
 		Kind:       kind,
 	}.raise(ch.opt.notifier)
-	
+
 	ch.paused.value = value
 }
 
@@ -111,7 +111,7 @@ func (ch *Channel) pause(value bool) {
 func (ch *Channel) manage() {
 	var notifiers PersistentNotifiers
 	recovering := true
-	
+
 	for {
 		if recovering {
 			recovering = false
@@ -120,7 +120,7 @@ func (ch *Channel) manage() {
 				go ch.gobble(notifiers.Consumer)
 			}
 		}
-		
+
 		select {
 		case <-ch.opt.ctx.Done():
 			ch.Close() // cancelCtx() called again but idempotent
@@ -169,17 +169,17 @@ func (ch *Channel) recover(err OptionalError, notifierStatus bool) bool {
 	if !callbackAllowedDown(ch.opt.cbDown, ch.opt.name, err) {
 		return false
 	}
-	
+
 	if !notifierStatus {
 		ch.baseChan.reset()
-		
+
 		Event{
 			SourceType: CliChannel,
 			SourceName: ch.opt.name,
 			Kind:       EventClosed,
 		}.raise(ch.opt.notifier)
 	}
-	
+
 	// no err means gracefully closed on demand
 	return err.IsSet() && ch.reconnectLoop(true)
 }
@@ -194,7 +194,7 @@ func (ch *Channel) rebase() bool {
 	kind := EventUp
 	result := true
 	optError := OptionalError{}
-	
+
 	if super, err := ch.conn.Channel(); err != nil {
 		kind = EventCannotEstablish
 		optError = SomeErrFromError(err, true)
@@ -202,7 +202,7 @@ func (ch *Channel) rebase() bool {
 	} else {
 		ch.baseChan.set(super)
 	}
-	
+
 	Event{
 		SourceType: CliChannel,
 		SourceName: ch.opt.name,
@@ -210,7 +210,7 @@ func (ch *Channel) rebase() bool {
 		Err:        optError,
 	}.raise(ch.opt.notifier)
 	callbackDoUp(result, ch.opt.cbUp, ch.opt.name)
-	
+
 	return result
 }
 
@@ -228,7 +228,7 @@ func (ch *Channel) reconnectLoop(recovering bool) bool {
 		if !callbackAllowedRecovery(ch.opt.cbReconnect, ch.opt.name, retry) {
 			return false
 		}
-		
+
 		if ch.rebase() {
 			// cannot decide (yet) which infra is critical, let the caller decide via the raised events
 			ch.makeTopology(recovering)
@@ -266,15 +266,15 @@ func (ch *Channel) makeTopology(recovering bool) {
 		return
 	}
 	defer chLocal.Close()
-	
+
 	for _, t := range ch.opt.topology {
 		if !t.Declare || (recovering && t.Durable) {
 			continue
 		}
-		
+
 		var name string
 		var optError OptionalError
-		
+
 		if t.IsExchange {
 			err := declareExchange(chLocal, t)
 			optError = SomeErrFromError(err, err != nil)
@@ -290,7 +290,7 @@ func (ch *Channel) makeTopology(recovering bool) {
 			ch.queue = name
 			ch.baseChan.mu.Unlock()
 		}
-		
+
 		Event{
 			SourceType: CliChannel,
 			SourceName: ch.opt.name,
@@ -311,7 +311,7 @@ func declareExchange(ch *amqp.Channel, t *TopologyOptions) error {
 		source, destination := t.GetRouting()
 		err = ch.ExchangeBind(destination, t.Bind.Key, source, t.Bind.NoWait, t.Bind.Args)
 	}
-	
+
 	return err
 }
 
@@ -334,6 +334,6 @@ func declareQueue(ch *amqp.Channel, t *TopologyOptions) (amqp.Queue, error) {
 			err = ch.QueueBind(queue.Name, t.Bind.Key, t.Bind.Peer, t.Bind.NoWait, t.Bind.Args)
 		}
 	}
-	
+
 	return queue, err
 }

@@ -3,7 +3,7 @@ package grabbit
 import (
 	"fmt"
 	"time"
-	
+
 	amqp "github.com/oarkflow/amqp/amqp091"
 )
 
@@ -38,9 +38,9 @@ type Publisher struct {
 }
 
 // defaultNotifyPublish provides a base implementation of [CallbackNotifyPublish] which can be
-// overwritten with [WithChannelOptionNotifyPublish]. If confirm.Ack is false
+// overwritten with [OnPublishSuccess]. If confirm.Ack is false
 // it sends an [EventMessagePublished] kind of event over the notification channel
-// (see [WithChannelOptionNotification]) with a literal error containing the delivery tag.
+// (see [WithChannelNotification]) with a literal error containing the delivery tag.
 func defaultNotifyPublish(confirm amqp.Confirmation, ch *Channel) {
 	if !confirm.Ack {
 		Event{
@@ -55,9 +55,9 @@ func defaultNotifyPublish(confirm amqp.Confirmation, ch *Channel) {
 }
 
 // defaultNotifyReturn provides a base implementation of [CallbackNotifyReturn] which can be
-// overwritten with [WithChannelOptionNotifyReturn].
+// overwritten with [OnPublishFailure].
 // It sends an [EventMessageReturned] kind of event over the notification channel
-// (see [WithChannelOptionNotification]) with a literal error containing the return message ID.
+// (see [WithChannelNotification]) with a literal error containing the return message ID.
 func defaultNotifyReturn(msg amqp.Return, ch *Channel) {
 	Event{
 		SourceType: CliChannel,
@@ -80,8 +80,8 @@ func NewPublisher(conn *Connection, opt PublisherOptions, optionFuncs ...func(*C
 	useParams := ChanUsageParameters{
 		PublisherUsageOptions: opt.PublisherUsageOptions,
 	}
-	chanOpt := append(optionFuncs, WithChannelOptionUsageParams(useParams))
-	
+	chanOpt := append(optionFuncs, WithChannelUsageParams(useParams))
+
 	return &Publisher{
 		channel: NewChannel(conn, chanOpt...),
 		opt:     opt,
@@ -97,7 +97,7 @@ func (p *Publisher) AwaitDeferredConfirmation(d *DeferredConfirmation, tmr time.
 		d.Outcome = ConfirmationDisabled
 		return d
 	}
-	
+
 	select {
 	case <-time.After(tmr):
 		d.Outcome = ConfirmationTimeOut
@@ -113,18 +113,18 @@ func (p *Publisher) AwaitDeferredConfirmation(d *DeferredConfirmation, tmr time.
 			d.Outcome = ConfirmationNAK
 		}
 	}
-	
+
 	return d
 }
 
 // Publish wraps the amqp.PublishWithContext using the internal [PublisherOptions]
 // cached when the publisher was created.
 func (p *Publisher) Publish(msg amqp.Publishing) error {
-	
+
 	if p.channel.IsClosed() {
 		return amqp.ErrClosed
 	}
-	
+
 	return p.channel.PublishWithContext(
 		p.opt.Context, p.opt.Exchange, p.opt.Key, p.opt.Mandatory, p.opt.Immediate,
 		msg)
@@ -136,7 +136,7 @@ func (p *Publisher) PublishDeferredConfirm(msg amqp.Publishing) (*DeferredConfir
 	if p.channel.IsClosed() {
 		return nil, amqp.ErrClosed
 	}
-	
+
 	var err error
 	confirmation := &DeferredConfirmation{
 		Outcome:         ConfirmationClosed,
@@ -146,17 +146,17 @@ func (p *Publisher) PublishDeferredConfirm(msg amqp.Publishing) (*DeferredConfir
 	}
 	confirmation.DeferredConfirmation, err = p.channel.PublishWithDeferredConfirmWithContext(
 		p.opt.Context, p.opt.Exchange, p.opt.Key, p.opt.Mandatory, p.opt.Immediate, msg)
-	
+
 	return confirmation, err
 }
 
 // PublishWithOptions wraps the amqp.PublishWithContext using the passed options.
 func (p *Publisher) PublishWithOptions(opt PublisherOptions, msg amqp.Publishing) error {
-	
+
 	if p.channel.IsClosed() {
 		return amqp.ErrClosed
 	}
-	
+
 	return p.channel.PublishWithContext(
 		opt.Context, opt.Exchange, opt.Key, opt.Mandatory, opt.Immediate,
 		msg)
@@ -167,7 +167,7 @@ func (p *Publisher) PublishDeferredConfirmWithOptions(opt PublisherOptions, msg 
 	if p.channel.IsClosed() {
 		return nil, amqp.ErrClosed
 	}
-	
+
 	var err error
 	confirmation := &DeferredConfirmation{
 		Outcome:         ConfirmationClosed,
@@ -177,7 +177,7 @@ func (p *Publisher) PublishDeferredConfirmWithOptions(opt PublisherOptions, msg 
 	}
 	confirmation.DeferredConfirmation, err = p.channel.PublishWithDeferredConfirmWithContext(
 		opt.Context, opt.Exchange, opt.Key, opt.Mandatory, opt.Immediate, msg)
-	
+
 	return confirmation, err
 }
 
@@ -197,18 +197,18 @@ func (p *Publisher) AwaitAvailable(timeout, pollFreq time.Duration) bool {
 	if pollFreq == 0 {
 		pollFreq = 330 * time.Millisecond
 	}
-	
+
 	// status polling
 	ticker := time.NewTicker(pollFreq)
 	defer ticker.Stop()
 	done := make(chan bool)
-	
+
 	// session timeout
 	go func() {
 		time.Sleep(timeout)
 		done <- true
 	}()
-	
+
 	for {
 		select {
 		case <-done:

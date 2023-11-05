@@ -1,6 +1,11 @@
 package grabbit
 
 import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -52,7 +57,7 @@ func NewConsumer(conn *Connection, opt ConsumerOptions, optionFuncs ...func(*Cha
 	useParams := ChanUsageParameters{
 		ConsumerUsageOptions: opt.ConsumerUsageOptions,
 	}
-	chanOpt := append(optionFuncs, WithChannelOptionUsageParams(useParams))
+	chanOpt := append(optionFuncs, WithChannelUsageParams(useParams))
 
 	return &Consumer{
 		channel: NewChannel(conn, chanOpt...),
@@ -103,4 +108,23 @@ func (c *Consumer) AwaitAvailable(timeout, pollFreq time.Duration) bool {
 // Close shuts down cleanly the publisher channel.
 func (c *Consumer) Close() error {
 	return c.channel.Close()
+}
+
+// Wait shuts down cleanly the publisher channel.
+func (c *Consumer) Wait(ctxCancel context.CancelFunc) {
+	defer ctxCancel()
+	// block main thread - wait for shutdown signal
+	sigs := make(chan os.Signal, 1)
+	done := make(chan struct{})
+
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigs
+		log.Println(sig)
+		close(done)
+	}()
+
+	log.Println("awaiting signal")
+	<-done
 }

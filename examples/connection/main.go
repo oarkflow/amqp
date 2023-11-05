@@ -45,11 +45,11 @@ func main() {
 
 	conn := grabbit.NewConnection(
 		"amqp://guest:guest@localhost:5672", amqp.Config{},
-		grabbit.WithConnectionOptionName(ConnectionName),
-		grabbit.WithConnectionOptionNotification(connStatusChan),
-		grabbit.WithConnectionOptionDown(Down),
-		grabbit.WithConnectionOptionUp(Up),
-		grabbit.WithConnectionOptionRecovering(Reattempting),
+		grabbit.WithConnectionName(ConnectionName),
+		grabbit.WithConnectionEvent(connStatusChan),
+		grabbit.OnConnectionDown(Down),
+		grabbit.OnConnectionUp(Up),
+		grabbit.OnConnectionRecovering(Reattempting),
 	)
 
 	defer func() {

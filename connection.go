@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"time"
-	
+
 	amqp "github.com/oarkflow/amqp/amqp091"
 )
 
@@ -24,12 +24,12 @@ type Connection struct {
 // Example Usage:
 //
 //	  conn := NewConnection("amqp://guest:guest@localhost:5672/", amqp.Config{},
-//		  WithConnectionOptionContext(context.Background(),
-//		  WithConnectionOptionName("default"),
-//		  WithConnectionOptionDown(Down),
-//		  WithConnectionOptionUp(Up),
-//		  WithConnectionOptionRecovering(Reattempting),
-//		  WithConnectionOptionNotification(connStatusChan),
+//		  WithConnectionCtx(context.Background(),
+//		  WithConnectionName("default"),
+//		  OnConnectionDown(Down),
+//		  OnConnectionUp(Up),
+//		  OnConnectionRecovering(Reattempting),
+//		  WithConnectionEvent(connStatusChan),
 //	  )
 //
 // Parameters:
@@ -45,26 +45,41 @@ func NewConnection(address string, config amqp.Config, optionFuncs ...func(*Conn
 		delayer:  DefaultDelayer{Value: 7500 * time.Millisecond},
 		ctx:      context.Background(),
 	}
-	
+
 	for _, optionFunc := range optionFuncs {
 		optionFunc(&opt)
 	}
-	
+	if opt.onEvent != nil {
+		events := make(chan Event, 10)
+		eventDone := make(chan bool)
+
+		go func() {
+			for {
+				select {
+				case event := <-events:
+					opt.onEvent(event)
+				case <-eventDone:
+					close(events)
+				}
+			}
+		}()
+		opt.notifier = events
+	}
 	conn := &Connection{
 		baseConn: SafeBaseConn{},
 		address:  address,
 		opt:      opt,
 	}
-	
+
 	conn.opt.ctx, conn.opt.cancelCtx = context.WithCancel(opt.ctx)
-	
+
 	go func() {
 		if !conn.reconnectLoop(config) {
 			return
 		}
 		conn.manage(config)
 	}()
-	
+
 	return conn
 }
 
@@ -86,14 +101,14 @@ func (conn *Connection) setFlow(value amqp.Blocking) {
 	conn.blocked.mu.Lock()
 	conn.blocked.value = value.Active
 	conn.blocked.mu.Unlock()
-	
+
 	var kind EventType
 	if value.Active {
 		kind = EventBlocked
 	} else {
 		kind = EventUnBlocked
 	}
-	
+
 	Event{
 		SourceType: CliConnection,
 		SourceName: conn.opt.name,
@@ -132,13 +147,13 @@ func (conn *Connection) refreshCredentials() {
 func (conn *Connection) notificationChannels() (chan *amqp.Error, chan amqp.Blocking, error) {
 	conn.baseConn.mu.Lock()
 	defer conn.baseConn.mu.Unlock()
-	
+
 	if conn.baseConn.super != nil {
 		evtClosed := conn.baseConn.super.NotifyClose(make(chan *amqp.Error))
 		evtBlocked := conn.baseConn.super.NotifyBlocked(make(chan amqp.Blocking)) // TODO: is this persistent (similar to chan.Flow?)
 		return evtClosed, evtBlocked, nil
 	}
-	
+
 	return nil, nil, errors.New("connection not yet available")
 }
 
@@ -154,7 +169,7 @@ func (conn *Connection) manage(config amqp.Config) {
 			time.Sleep(conn.opt.delayer.Delay(3))
 			continue
 		}
-		
+
 		select {
 		case <-conn.opt.ctx.Done():
 			conn.Close() // cancelCtx() called again but idempotent
@@ -190,14 +205,14 @@ func (conn *Connection) recover(config amqp.Config, err OptionalError, notifierS
 		Kind:       EventDown,
 		Err:        err,
 	}.raise(conn.opt.notifier)
-	
+
 	if !callbackAllowedDown(conn.opt.cbDown, conn.opt.name, err) {
 		return false
 	}
-	
+
 	if !notifierStatus {
 		conn.baseConn.reset()
-		
+
 		Event{
 			SourceType: CliConnection,
 			SourceName: conn.opt.name,
@@ -219,9 +234,9 @@ func (conn *Connection) rebase(config amqp.Config) bool {
 	result := true
 	kind := EventUp
 	optError := OptionalError{}
-	
+
 	conn.refreshCredentials()
-	
+
 	if super, err := amqp.DialConfig(conn.address, config); err != nil {
 		optError = SomeErrFromError(err, true)
 		kind = EventCannotEstablish
@@ -229,7 +244,7 @@ func (conn *Connection) rebase(config amqp.Config) bool {
 	} else {
 		conn.baseConn.set(super)
 	}
-	
+
 	Event{
 		SourceType: CliConnection,
 		SourceName: conn.opt.name,
@@ -237,7 +252,7 @@ func (conn *Connection) rebase(config amqp.Config) bool {
 		Err:        optError,
 	}.raise(conn.opt.notifier)
 	callbackDoUp(result, conn.opt.cbUp, conn.opt.name)
-	
+
 	return result
 }
 
@@ -253,7 +268,7 @@ func (conn *Connection) reconnectLoop(config amqp.Config) bool {
 		if !callbackAllowedRecovery(conn.opt.cbReconnect, conn.opt.name, retry) {
 			return false
 		}
-		
+
 		if conn.rebase(config) {
 			return true
 		}

@@ -58,30 +58,30 @@ func main() {
 
 	conn := grabbit.NewConnection(
 		"amqp://guest:guest@localhost:5672", amqp.Config{},
-		grabbit.WithConnectionOptionName("conn.main"),
-		grabbit.WithConnectionOptionNotification(connStatusChan),
-		grabbit.WithConnectionOptionDown(ConnDown),
-		grabbit.WithConnectionOptionUp(ConnUp),
-		grabbit.WithConnectionOptionRecovering(ConnReattempting),
+		grabbit.WithConnectionName("conn.main"),
+		grabbit.WithConnectionEvent(connStatusChan),
+		grabbit.OnConnectionDown(ConnDown),
+		grabbit.OnConnectionUp(ConnUp),
+		grabbit.OnConnectionRecovering(ConnReattempting),
 	)
 
 	dataStatusChan := make(chan grabbit.Event, 5)
 	ctxData, ctxDataCancel := context.WithCancel(context.TODO())
 
 	dataCh := grabbit.NewChannel(conn,
-		grabbit.WithChannelOptionContext(ctxData),
-		grabbit.WithChannelOptionName("chan.data"),
-		grabbit.WithChannelOptionNotification(dataStatusChan),
-		grabbit.WithChannelOptionDown(DataChanDown),
-		grabbit.WithChannelOptionUp(DataChanUp),
-		grabbit.WithChannelOptionRecovering(DataChanReattempting),
+		grabbit.WithChannelCtx(ctxData),
+		grabbit.WithChannelName("chan.data"),
+		grabbit.WithChannelNotification(dataStatusChan),
+		grabbit.OnChannelDown(DataChanDown),
+		grabbit.OnChannelUp(DataChanUp),
+		grabbit.OnChannelRecovering(DataChanReattempting),
 		// we also support these:
-		// WithChannelOptionDelay(...)      // see DelayProvider
-		// WithChannelOptionNotifyPublish() // see CallbackNotifyPublish, publishers
-		// WithChannelOptionNotifyReturn()  // see CallbackNotifyReturn, publishers
-		// WithChannelOptionProcessor()     // see CallbackProcessMessages, consumers
-		// WithChannelOptionTopology()      // see TopologyOptions, publishers & consumers
-		// WithChannelOptionUsageParams()   // see ChanUsageParameters, publishers and consumers
+		// WithChannelDelay(...)      // see DelayProvider
+		// OnPublishSuccess() // see CallbackNotifyPublish, publishers
+		// OnPublishFailure()  // see CallbackNotifyReturn, publishers
+		// WithChannelProcessor()     // see CallbackProcessMessages, consumers
+		// WithChannelTopology()      // see TopologyOptions, publishers & consumers
+		// WithChannelUsageParams()   // see ChanUsageParameters, publishers and consumers
 	)
 
 	// data channel related notifications and perform desired actions based on this

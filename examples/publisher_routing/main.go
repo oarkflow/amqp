@@ -57,9 +57,9 @@ func main() {
 
 	conn := grabbit.NewConnection(
 		"amqp://guest:guest@localhost:5672", amqp.Config{},
-		grabbit.WithConnectionOptionContext(ctxMaster),
-		grabbit.WithConnectionOptionName("conn.main"),
-		grabbit.WithConnectionOptionNotification(connStatusChan),
+		grabbit.WithConnectionCtx(ctxMaster),
+		grabbit.WithConnectionName("conn.main"),
+		grabbit.WithConnectionEvent(connStatusChan),
 	)
 
 	topos := make([]*grabbit.TopologyOptions, 0, 8)
@@ -125,8 +125,8 @@ func main() {
 	opt.WithContext(ctxMaster).WithConfirmationsCount(20)
 
 	publisher := grabbit.NewPublisher(conn, opt,
-		grabbit.WithChannelOptionName("chan.publisher"),
-		grabbit.WithChannelOptionTopology(topos),
+		grabbit.WithChannelName("chan.publisher"),
+		grabbit.WithChannelTopology(topos),
 	)
 
 	if !publisher.AwaitAvailable(10*time.Second, 1*time.Second) {
@@ -163,13 +163,13 @@ func main() {
 
 	_ = grabbit.NewConsumer(conn,
 		*optConsumer.WithName("cons.emails").WithQueue(QUEUE_EMAILS),
-		grabbit.WithChannelOptionName("chan.emails/info"),
-		grabbit.WithChannelOptionProcessor(MsgHandler),
+		grabbit.WithChannelName("chan.emails/info"),
+		grabbit.WithChannelProcessor(MsgHandler),
 	)
 	_ = grabbit.NewConsumer(conn,
 		*optConsumer.WithName("cons.pagers").WithQueue(QUEUE_PAGERS),
-		grabbit.WithChannelOptionName("chan.pagers/alert"),
-		grabbit.WithChannelOptionProcessor(MsgHandler),
+		grabbit.WithChannelName("chan.pagers/alert"),
+		grabbit.WithChannelProcessor(MsgHandler),
 	)
 
 	// block main thread - wait for shutdown signal

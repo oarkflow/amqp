@@ -3,20 +3,20 @@ package grabbit
 import (
 	"context"
 	"time"
-	
+
 	amqp "github.com/oarkflow/amqp/amqp091"
 )
 
 // SecretProvider allows passing a bespoke method for providing the
 // secret required when connecting to the Rabbit engine.
-// See [WithConnectionOptionPassword].
+// See [WithConnectionPassword].
 type SecretProvider interface {
 	Password() (string, error)
 }
 
 // DelayProvider allows passing a bespoke method for providing the
 // delay policy for waiting between reconnection attempts.
-// See [WithConnectionOptionDelay], [WithChannelOptionDelay]. TIP:
+// See [WithConnectionDelay], [WithChannelDelay]. TIP:
 // one could pass en exponential delayer derived from the 'retry' counter.
 type DelayProvider interface {
 	Delay(retry int) time.Duration
@@ -36,20 +36,20 @@ func (delayer DefaultDelayer) Delay(retry int) time.Duration {
 
 // CallbackWhenDown defines a function type used when connection was lost.
 // Returns false when want aborting this connection.
-// Pass your implementations via [WithChannelOptionDown] and [WithConnectionOptionDown].
+// Pass your implementations via [OnChannelDown] and [OnConnectionDown].
 type CallbackWhenDown func(name string, err OptionalError) bool
 
 // CallbackWhenUp defines a function type used after a successful connection or channel recovery.
 // Applications can define their own handler and pass it via
-// [WithConnectionOptionUp] and [WithChannelOptionUp].
+// [OnConnectionUp] and [OnChannelUp].
 type CallbackWhenUp func(name string)
 
 // CallbackNotifyPublish defines a function type for handling the publish notifications.
-// Applications can define their own handler and pass it via [WithChannelOptionNotifyPublish].
+// Applications can define their own handler and pass it via [OnPublishSuccess].
 type CallbackNotifyPublish func(confirm amqp.Confirmation, ch *Channel)
 
 // CallbackNotifyReturn defines a function type for handling the return notifications.
-// Applications can define their own handler and pass it via [WithChannelOptionNotifyReturn].
+// Applications can define their own handler and pass it via [OnPublishFailure].
 type CallbackNotifyReturn func(confirm amqp.Return, ch *Channel)
 
 // DeliveriesProperties captures the common attributes of multiple commonly grouped
@@ -116,17 +116,17 @@ func DeliveryDataFrom(d *amqp.Delivery) (data DeliveryData) {
 }
 
 // CallbackProcessMessages defines a user passed function for processing the received messages.
-// Applications can define their own handler and pass it via [WithChannelOptionProcessor].
+// Applications can define their own handler and pass it via [WithChannelProcessor].
 type CallbackProcessMessages func(props *DeliveriesProperties, messages []DeliveryData, mustAck bool, ch *Channel)
 
 // CallbackWhenRecovering defines a function used prior to recovering a connection.
 // Returns false when want aborting this connection.
 // Applications can define their own handler and pass it via
-// [WithChannelOptionRecovering] and [WithConnectionOptionRecovering].
+// [OnChannelRecovering] and [OnConnectionRecovering].
 type CallbackWhenRecovering func(name string, retry int) bool
 
 // callbackAllowedRecovery performs the user test
-// (when provided via WithConnectionOptionRecovering, WithChannelOptionRecovering)
+// (when provided via OnConnectionRecovering, OnChannelRecovering)
 // for allowing the recovery process. Returning 'false' will break out the reconnecting loop
 // (impl.details chanReconnectLoop, connReconnectLoop).
 func callbackAllowedRecovery(cb CallbackWhenRecovering, name string, attempt int) bool {
@@ -134,14 +134,14 @@ func callbackAllowedRecovery(cb CallbackWhenRecovering, name string, attempt int
 }
 
 // callbackAllowedDown performs the user test
-// (when provided via [WithChannelOptionDown], [WithConnectionOptionDown])
+// (when provided via [OnChannelDown], [OnConnectionDown])
 // for allowing continuing to the recovery process. Returning 'false' will break out the reconnecting loop
 // (impl.details connRecover, chanRecover).
 func callbackAllowedDown(cb CallbackWhenDown, name string, err OptionalError) bool {
 	return cb == nil || cb(name, err)
 }
 
-// callbackDoUp performs the user action (when provided via WithChannelOptionUp, WithConnectionOptionUp)
+// callbackDoUp performs the user action (when provided via OnChannelUp, OnConnectionUp)
 // as part of completion of a new connection (chanReconnectLoop->chanGetNew) or
 // channel (chanReconnectLoop->chanGetNew).
 func callbackDoUp(want bool, cb CallbackWhenUp, name string) {
@@ -150,7 +150,7 @@ func callbackDoUp(want bool, cb CallbackWhenUp, name string) {
 	}
 }
 
-// delayerCompleted waits for the provided (WithConnectionOptionDelay, WithChannelOptionDelay)
+// delayerCompleted waits for the provided (WithConnectionDelay, WithChannelDelay)
 // or default (DefaultDelayer) timing-out policy to complete as part of the recovery loop
 // (see chanReconnectLoop, connReconnectLoop).
 func delayerCompleted(ctx context.Context, delayer DelayProvider, attempt int) bool {
@@ -159,6 +159,6 @@ func delayerCompleted(ctx context.Context, delayer DelayProvider, attempt int) b
 		return false
 	case <-time.After(delayer.Delay(attempt)):
 	}
-	
+
 	return true
 }

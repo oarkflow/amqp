@@ -136,9 +136,9 @@ func main() {
 
 	conn := grabbit.NewConnection(
 		"amqp://guest:guest@localhost:5672", amqp.Config{},
-		grabbit.WithConnectionOptionContext(ctxMaster),
-		grabbit.WithConnectionOptionName(ConnectionName),
-		grabbit.WithConnectionOptionNotification(events),
+		grabbit.WithConnectionCtx(ctxMaster),
+		grabbit.WithConnectionName(ConnectionName),
+		grabbit.WithConnectionEvent(events),
 	)
 
 	opt := grabbit.DefaultPublisherOptions()
@@ -153,9 +153,9 @@ func main() {
 	})
 
 	publisher := grabbit.NewPublisher(conn, opt,
-		grabbit.WithChannelOptionName(PublisherName),
-		grabbit.WithChannelOptionTopology(topos),
-		grabbit.WithChannelOptionNotifyReturn(OnNotifyReturn),
+		grabbit.WithChannelName(PublisherName),
+		grabbit.WithChannelTopology(topos),
+		grabbit.OnPublishFailure(OnNotifyReturn),
 	)
 
 	if !publisher.AwaitAvailable(30*time.Second, 1*time.Second) {
@@ -180,20 +180,20 @@ func main() {
 
 	// start many consumers
 	_ = grabbit.NewConsumer(conn, *optConsumer.WithPrefetchCount(8).WithName("consumer.one"),
-		grabbit.WithChannelOptionName("chan.cons.one"),
-		grabbit.WithChannelOptionProcessor(MsgHandler(rnd, &mu, validate)),
+		grabbit.WithChannelName("chan.cons.one"),
+		grabbit.WithChannelProcessor(MsgHandler(rnd, &mu, validate)),
 	)
 	_ = grabbit.NewConsumer(conn, *optConsumer.WithPrefetchCount(3).WithName("consumer.two"),
-		grabbit.WithChannelOptionName("chan.cons.two"),
-		grabbit.WithChannelOptionProcessor(MsgHandler(rnd, &mu, validate)),
+		grabbit.WithChannelName("chan.cons.two"),
+		grabbit.WithChannelProcessor(MsgHandler(rnd, &mu, validate)),
 	)
 	_ = grabbit.NewConsumer(conn, *optConsumer.WithPrefetchCount(4).WithName("consumer.three"),
-		grabbit.WithChannelOptionName("chan.cons.three"),
-		grabbit.WithChannelOptionProcessor(MsgHandler(rnd, &mu, validate)),
+		grabbit.WithChannelName("chan.cons.three"),
+		grabbit.WithChannelProcessor(MsgHandler(rnd, &mu, validate)),
 	)
 	_ = grabbit.NewConsumer(conn, *optConsumer.WithPrefetchCount(7).WithName("consumer.four"),
-		grabbit.WithChannelOptionName("chan.cons.four"),
-		grabbit.WithChannelOptionProcessor(MsgHandler(rnd, &mu, validate)),
+		grabbit.WithChannelName("chan.cons.four"),
+		grabbit.WithChannelProcessor(MsgHandler(rnd, &mu, validate)),
 	)
 
 	// block main thread - wait for shutdown signal

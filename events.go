@@ -44,8 +44,8 @@ const (
 )
 
 // Event defines a simple body structure for the alerts received
-// via the notification channels passed in [WithChannelOptionNotification]
-// and [WithConnectionOptionNotification].
+// via the notification channels passed in [WithChannelNotification]
+// and [WithConnectionEvent].
 type Event struct {
 	SourceType ClientType    // origin type
 	SourceName string        // origin tag
@@ -58,7 +58,7 @@ type Event struct {
 // over the provided notification channel. If the notification channel does not have enough capacity,
 // it ignores the event and does nothing.
 //
-// See WithChannelOptionNotification and WithConnectionOptionNotification
+// See WithChannelNotification and WithConnectionEvent
 func (event Event) raise(ch chan Event) {
 	select {
 	case ch <- event:

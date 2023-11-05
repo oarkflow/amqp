@@ -44,7 +44,7 @@ func AwaitDown(ch *grabbit.Channel, timeout, pollFreq time.Duration) bool {
 func main() {
 	conn := grabbit.NewConnection(
 		"amqp://guest:guest@localhost:5672", amqp.Config{},
-		grabbit.WithConnectionOptionName("conn.main"),
+		grabbit.WithConnectionName("conn.main"),
 	)
 
 	alphaStatusChan := make(chan grabbit.Event, 5)
@@ -54,14 +54,14 @@ func main() {
 	betaStatusChan := make(chan grabbit.Event, 5)
 
 	alphaCh := grabbit.NewChannel(conn,
-		grabbit.WithChannelOptionContext(ctxAlpha),
-		grabbit.WithChannelOptionName("chan.alpha"),
-		grabbit.WithChannelOptionNotification(alphaStatusChan),
+		grabbit.WithChannelCtx(ctxAlpha),
+		grabbit.WithChannelName("chan.alpha"),
+		grabbit.WithChannelNotification(alphaStatusChan),
 	)
 	betaCh := grabbit.NewChannel(conn,
-		grabbit.WithChannelOptionContext(ctxBeta),
-		grabbit.WithChannelOptionName("chan.beta"),
-		grabbit.WithChannelOptionNotification(betaStatusChan),
+		grabbit.WithChannelCtx(ctxBeta),
+		grabbit.WithChannelName("chan.beta"),
+		grabbit.WithChannelNotification(betaStatusChan),
 	)
 
 	chSignalBetaUp := make(chan struct{})
