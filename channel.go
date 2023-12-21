@@ -73,6 +73,14 @@ func NewChannel(conn *Connection, optionFuncs ...func(*ChannelOptions)) *Channel
 	return ch
 }
 
+func (ch *Channel) Pause() {
+	ch.pause(true)
+}
+
+func (ch *Channel) Resume() {
+	ch.pause(false)
+}
+
 // pause marks the channel as paused or unpaused.
 //
 // It takes a boolean value as a parameter.

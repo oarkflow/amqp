@@ -47,13 +47,7 @@ func PublishMsg(publisher *grabbit.Publisher, start, end int) {
 
 func main() {
 	ctxMaster, ctxCancel := context.WithCancel(context.TODO())
-
-	conn := grabbit.NewConnection(
-		"amqp://guest:guest@localhost:5672", amqp.Config{},
-		grabbit.WithConnectionCtx(ctxMaster),
-		grabbit.WithConnectionName("conn.main"),
-	)
-
+	conn := grabbit.NewConnection("amqp://guest:guest@localhost:5672", amqp.Config{}, grabbit.WithConnectionCtx(ctxMaster))
 	pubOpt := grabbit.DefaultPublisherOptions()
 	pubOpt.WithKey("workload").WithContext(ctxMaster).WithConfirmationsCount(20)
 
@@ -64,21 +58,18 @@ func main() {
 		Durable:       true,
 		Declare:       true,
 	})
-
 	publisher := grabbit.NewPublisher(conn, pubOpt,
 		grabbit.WithChannelCtx(ctxMaster),
-		grabbit.WithChannelName("chan.publisher.example"),
 		grabbit.WithChannelTopology(topos),
 		grabbit.OnChannelRecovering(OnPubReattempting),
 		grabbit.OnPublishSuccess(OnNotifyPublish),
 		grabbit.OnPublishFailure(OnNotifyReturn),
 	)
-
 	if !publisher.AwaitAvailable(30*time.Second, 1*time.Second) {
 		log.Println("publisher not ready yet")
 		ctxCancel()
 		return
 	}
 
-	PublishMsg(publisher, 0, 5)
+	PublishMsg(publisher, 0, 500000)
 }

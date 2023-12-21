@@ -42,24 +42,11 @@ func main() {
 	const QUEUE_EMAILS = "queue.emails"      // emails deposit for info routed messages
 	const EXCHANGE_LOGS = "exch.direct.logs" // direct key dispatch exchange
 	const EXCHANGE_GATEWAY = "exch.topic"    // by topic dispatch exchange
-
-	connStatusChan := make(chan grabbit.Event, 10)
-	defer close(connStatusChan)
-
 	ctxMaster, ctxCancel := context.WithCancel(context.TODO())
-
-	// await and log any infrastructure notifications
-	go func() {
-		for event := range connStatusChan {
-			log.Println("notification: ", event)
-		}
-	}()
 
 	conn := grabbit.NewConnection(
 		"amqp://guest:guest@localhost:5672", amqp.Config{},
 		grabbit.WithConnectionCtx(ctxMaster),
-		grabbit.WithConnectionName("conn.main"),
-		grabbit.WithConnectionEvent(connStatusChan),
 	)
 
 	topos := make([]*grabbit.TopologyOptions, 0, 8)
@@ -163,12 +150,10 @@ func main() {
 
 	_ = grabbit.NewConsumer(conn,
 		*optConsumer.WithName("cons.emails").WithQueue(QUEUE_EMAILS),
-		grabbit.WithChannelName("chan.emails/info"),
 		grabbit.WithChannelProcessor(MsgHandler),
 	)
 	_ = grabbit.NewConsumer(conn,
 		*optConsumer.WithName("cons.pagers").WithQueue(QUEUE_PAGERS),
-		grabbit.WithChannelName("chan.pagers/alert"),
 		grabbit.WithChannelProcessor(MsgHandler),
 	)
 
