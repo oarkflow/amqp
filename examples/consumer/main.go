@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"syscall"
 	"time"
 
 	amqp "github.com/oarkflow/amqp/amqp091"
@@ -25,11 +26,12 @@ func main() {
 	}
 
 	optConsumerOne := grabbit.DefaultConsumerOptions()
-	optConsumerOne.WithName("consumer.one").WithPrefetchCount(100).WithQueue("auto_generated_will_take_over").WithPrefetchTimeout(1 * time.Second)
+	optConsumerOne.WithName("consumer.one").WithQosGlobal(true).WithPrefetchCount(100).WithQueue("auto_generated_will_take_over").WithPrefetchTimeout(1 * time.Second)
 	consumer := grabbit.NewConsumer(conn, optConsumerOne,
 		grabbit.WithChannelName("chan.consumer.one"),
 		grabbit.WithChannelTopology(topos),
 		grabbit.OnChannelDown(func(name string, err grabbit.OptionalError) bool {
+			syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 			log.Printf("callback: {%s} went down with {%s}", name, err)
 			return true
 		}),
