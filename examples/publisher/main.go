@@ -37,7 +37,7 @@ func PublishMsg(publisher *grabbit.Publisher, start, end int) {
 	buff := bytes.NewBuffer(data)
 
 	for i := start; i < end; i++ {
-		// <-time.After(1 * time.Millisecond)
+		<-time.After(1 * time.Microsecond)
 		buff.Reset()
 		buff.WriteString(fmt.Sprintf("test number %04d", i))
 		message.Body = buff.Bytes()
@@ -66,8 +66,8 @@ func main() {
 		grabbit.WithChannelCtx(ctxMaster),
 		grabbit.WithChannelTopology(topos),
 		grabbit.OnChannelRecovering(OnPubReattempting),
-		grabbit.OnPublishSuccess(OnNotifyPublish),
-		grabbit.OnPublishFailure(OnNotifyReturn),
+		// grabbit.OnPublishSuccess(OnNotifyPublish),
+		// grabbit.OnPublishFailure(OnNotifyReturn),
 	)
 	if !publisher.AwaitAvailable(30*time.Second, 1*time.Second) {
 		log.Println("publisher not ready yet")

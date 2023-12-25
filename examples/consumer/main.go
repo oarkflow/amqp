@@ -26,7 +26,7 @@ func main() {
 	}
 
 	optConsumerOne := grabbit.DefaultConsumerOptions()
-	optConsumerOne.WithName("consumer.one").WithQosGlobal(true).WithPrefetchCount(100).WithPrefetchTimeout(1 * time.Second)
+	optConsumerOne.WithName("consumer.one"). /*.WithQosGlobal(true).WithPrefetchSize(100).WithPrefetchCount(100)*/ WithPrefetchTimeout(1 * time.Second)
 	consumer := grabbit.NewConsumer(conn, optConsumerOne,
 		grabbit.WithChannelName("chan.consumer.one"),
 		grabbit.WithChannelTopology(topos),
