@@ -29,6 +29,9 @@ func OnNotifyReturn(_ amqp.Return, ch *grabbit.Channel) {
 
 func PublishMsg(publisher *grabbit.Publisher, start, end int) {
 	message := amqp.Publishing{}
+	message.Headers = map[string]any{
+		"next-queue": "I'm loving it",
+	}
 	data := make([]byte, 0, 64)
 	buff := bytes.NewBuffer(data)
 

@@ -192,6 +192,10 @@ func (ch *Channel) recover(err OptionalError, notifierStatus bool) bool {
 	return err.IsSet() && ch.reconnectLoop(true)
 }
 
+func (ch *Channel) Context() context.Context {
+	return ch.opt.ctx
+}
+
 // rebase tries to establish a new base channel and returns a boolean indicating success or failure.
 // It sends en event notification with either EventUp or EventCannotEstablish, depending
 // on the new channel status.
