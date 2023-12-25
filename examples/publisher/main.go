@@ -28,7 +28,8 @@ func OnNotifyReturn(_ amqp.Return, ch *grabbit.Channel) {
 }
 
 func PublishMsg(publisher *grabbit.Publisher, start, end int) {
-	message := amqp.Publishing{}
+	message := amqp.Publishing{DeliveryMode: amqp.Persistent}
+	// message := amqp.Publishing{}
 	message.Headers = map[string]any{
 		"next-queue": "I'm loving it",
 	}
@@ -36,7 +37,7 @@ func PublishMsg(publisher *grabbit.Publisher, start, end int) {
 	buff := bytes.NewBuffer(data)
 
 	for i := start; i < end; i++ {
-		<-time.After(1 * time.Second)
+		// <-time.After(1 * time.Millisecond)
 		buff.Reset()
 		buff.WriteString(fmt.Sprintf("test number %04d", i))
 		message.Body = buff.Bytes()
