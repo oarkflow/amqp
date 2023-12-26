@@ -13,7 +13,7 @@ import (
 
 func MsgHandler(props *grabbit.DeliveriesProperties, messages []grabbit.DeliveryData, mustAck bool, ch *grabbit.Channel) {
 	for _, msg := range messages {
-		log.Printf("  [%s][%s] got message: %s with header %s;\n", ch.Name(), props.ConsumerTag, string(msg.Body), props.Headers["next-queue"])
+		log.Printf("  [%s][%s] got message: %s;\n", ch.Name(), props.ConsumerTag, string(msg.Body))
 		ch.Ack(msg.DeliveryTag, false)
 	}
 }
@@ -26,7 +26,7 @@ func main() {
 	}
 
 	optConsumerOne := grabbit.DefaultConsumerOptions()
-	optConsumerOne.WithName("consumer.one"). /*.WithQosGlobal(true).WithPrefetchSize(100).WithPrefetchCount(100)*/ WithPrefetchTimeout(1 * time.Second)
+	optConsumerOne.WithName("consumer.one").WithQosGlobal(true).WithPrefetchTimeout(1 * time.Second)
 	consumer := grabbit.NewConsumer(conn, optConsumerOne,
 		grabbit.WithChannelName("chan.consumer.one"),
 		grabbit.WithChannelTopology(topos),

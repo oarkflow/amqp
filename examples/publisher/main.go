@@ -30,14 +30,11 @@ func OnNotifyReturn(_ amqp.Return, ch *grabbit.Channel) {
 func PublishMsg(publisher *grabbit.Publisher, start, end int) {
 	message := amqp.Publishing{DeliveryMode: amqp.Persistent}
 	// message := amqp.Publishing{}
-	message.Headers = map[string]any{
-		"next-queue": "I'm loving it",
-	}
 	data := make([]byte, 0, 64)
 	buff := bytes.NewBuffer(data)
 
 	for i := start; i < end; i++ {
-		<-time.After(1 * time.Microsecond)
+		// <-time.After(1 * time.Microsecond)
 		buff.Reset()
 		buff.WriteString(fmt.Sprintf("test number %04d", i))
 		message.Body = buff.Bytes()
@@ -53,7 +50,7 @@ func main() {
 	ctxMaster, ctxCancel := context.WithCancel(context.TODO())
 	conn := grabbit.NewConnection("amqp://guest:guest@localhost:5672", amqp.Config{}, grabbit.WithConnectionCtx(ctxMaster))
 	pubOpt := grabbit.DefaultPublisherOptions()
-	pubOpt.WithKey("workload").WithContext(ctxMaster).WithConfirmationsCount(20)
+	pubOpt.WithKey("workload").WithContext(ctxMaster).WithConfirmationsCount(200)
 
 	topos := make([]*grabbit.TopologyOptions, 0, 8)
 	topos = append(topos, &grabbit.TopologyOptions{
@@ -66,8 +63,6 @@ func main() {
 		grabbit.WithChannelCtx(ctxMaster),
 		grabbit.WithChannelTopology(topos),
 		grabbit.OnChannelRecovering(OnPubReattempting),
-		// grabbit.OnPublishSuccess(OnNotifyPublish),
-		// grabbit.OnPublishFailure(OnNotifyReturn),
 	)
 	if !publisher.AwaitAvailable(30*time.Second, 1*time.Second) {
 		log.Println("publisher not ready yet")
@@ -75,5 +70,5 @@ func main() {
 		return
 	}
 
-	PublishMsg(publisher, 0, 500000)
+	PublishMsg(publisher, 0, 5)
 }
